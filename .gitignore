@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+
+# Other common ignores
+/venv/
+*.log
