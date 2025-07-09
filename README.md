@@ -8,7 +8,7 @@ Developed with [marsh-fish](https://github.com/marsh-fish)
 
 !skip：這首不愛？馬上切歌！
 
-!pause：中場休息。
+!pause：中場休息！
 
 !resume：繼續嗨！
 
