@@ -34,7 +34,8 @@ YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': True,
     'quiet': True,
-    'default_search': 'auto',
+    'skip_download': True,
+    'default_search': 'ytsearch1',
     'source_address': '0.0.0.0'
 }
 FFMPEG_OPTIONS = {
