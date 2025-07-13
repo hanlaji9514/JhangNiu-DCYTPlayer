@@ -194,7 +194,7 @@ class MusicEngine:
             self.last_ctx = next_song_request['ctx']
             
             loop = self.bot.loop
-            song_info = await loop.run_in_executor(None, self.search_youtube, next_song_request['search'])
+            song_info = await loop.run_in_executor(None, self.get_song_info, next_song_request['search'])
 
             if song_info is None:
                 await self.last_ctx.send(f"❌ 抱歉，找不到 `{next_song_request['search']}` 這首歌。")
@@ -225,15 +225,57 @@ class MusicEngine:
             await finished.wait()
             self.current_song = None
 
-    def search_youtube(self, search):
-        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+    def get_song_info(self, search_query: str):
+        """
+        Searches for a song using the YouTube API if it's not a URL.
+        Then uses yt_dlp to extract the stream info.
+        """
+        # Regex to check if the query is a YouTube URL
+        url_match = re.match(
+            r'https?://(www\.)?(youtube\.com/watch\?v=|youtu\.be/)(?P<id>[a-zA-Z0-9_-]{11})', 
+            search_query
+        )
+
+        video_url = search_query
+        
+        # If it's not a URL, use the API to search
+        if not url_match:
+            print(f"'{search_query}' is not a URL, searching with YouTube API...")
             try:
-                info = ydl.extract_info(search, download=False)
-                if 'entries' in info: info = info['entries'][0]
-                return {'source': info['url'], 'title': info.get('title', '未知歌曲'), 'duration': info.get('duration', 0)}
+                search_params = {
+                    'part': 'snippet',
+                    'q': search_query,
+                    'key': API_KEY,
+                    'type': 'video',
+                    'maxResults': 1
+                }
+                response = requests.get('https://www.googleapis.com/youtube/v3/search', params=search_params).json()
+                
+                video_id = response['items'][0]['id']['videoId']
+                video_url = f'https://www.youtube.com/watch?v={video_id}'
+                print(f"API found video: {video_url}")
+
             except Exception as e:
-                print(f"在搜尋時發生錯誤: {e}")
-                return None
+                print(f"YouTube API search failed: {e}")
+                # Fallback to yt_dlp's search if API fails
+                video_url = f"ytsearch:{search_query}"
+
+        # Now, use yt_dlp to get the stream URL from the determined video_url
+        try:
+            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+                if 'entries' in info:
+                    info = info['entries'][0]
+                
+                return {
+                    'source': info['url'], 
+                    'title': info.get('title', 'Unknown Title'), 
+                    'duration': info.get('duration', 0),
+                    'webpage_url': info.get('webpage_url', video_url)
+                }
+        except Exception as e:
+            print(f"yt_dlp failed to extract info for '{video_url}': {e}")
+            return None
     
     def get_title_from_url(self, url, api_key=API_KEY):
         match = re.search(r'v=([a-zA-Z0-9_-]{11})', url)
