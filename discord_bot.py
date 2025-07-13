@@ -371,6 +371,8 @@ async def play(ctx, *, search: str = None):
         return
     
     song_title = music_engine.get_title_from_url(search)
+    if song_title is None:
+        song_title = search
 
     request = { 
         'ctx': ctx, 
@@ -381,10 +383,7 @@ async def play(ctx, *, search: str = None):
     }
     
     await music_engine.queue.put(request)
-    if song_title is None:
-        await ctx.send(f"✅ 已將 `{search}` 加入到待播清單！")
-    else:
-        await ctx.send(f"✅ 已將 `{song_title}` 加入到待播清單！")
+    await ctx.send(f"✅ 已將 `{song_title}` 加入到待播清單！")
 
 @bot.command(name='skip', help='跳過目前的歌曲')
 async def skip(ctx):
