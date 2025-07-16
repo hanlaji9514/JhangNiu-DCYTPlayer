@@ -273,7 +273,8 @@ class MusicEngine:
                     'source': info['url'], 
                     'title': info.get('title', 'Unknown Title'), 
                     'duration': info.get('duration', 0),
-                    'webpage_url': info.get('webpage_url', video_url)
+                    'webpage_url': info.get('webpage_url', video_url),
+                    'thumbnail': info.get('thumbnail')
                 }
         except Exception as e:
             print(f"yt_dlp failed to extract info for '{video_url}': {e}")
@@ -426,6 +427,31 @@ async def queue_command(ctx):
     embed = music_engine.create_queue_embed()
     await ctx.send(embed=embed)
 
+@bot.command(name='np', aliases=['nowplaying'], help='顯示目前播放的歌曲與進度')
+async def now_playing(ctx):
+    music_engine = get_music_engine(ctx)
+    if not music_engine.current_song:
+        await ctx.send("目前沒有歌曲正在播放。", ephemeral=True)
+        return
+
+    song = music_engine.current_song
+    current_time = music_engine.get_current_playback_time()
+    progress_bar = music_engine.create_progress_bar(current_time)
+
+    embed = discord.Embed(
+        title="▶️ 正在播放",
+        description=f"**[{song['title']}]({song['webpage_url']})**",
+        color=discord.Color.green()
+    )
+    if song.get('thumbnail'):
+        embed.set_thumbnail(url=song['thumbnail'])
+    
+    embed.add_field(name="進度", value=progress_bar, inline=False)
+    embed.add_field(name="點播者", value=song['requester'].mention, inline=False)
+
+    controls = MusicControlsView(music_engine)
+
+    await ctx.send(embed=embed, view=controls, ephemeral=True)
 
 # --- 啟動 Bot ---
 bot.run(TOKEN)
