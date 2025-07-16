@@ -15,3 +15,5 @@ Developed with [marsh-fish](https://github.com/marsh-fish)
 !leave：牛牛下班啦～
 
 !queue：看目前有點什麼歌！會顯示是誰點的喔！
+
+!nowplaying (np)：偷看一下現在是哪首歌！👀
