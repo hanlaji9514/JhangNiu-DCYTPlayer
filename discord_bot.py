@@ -83,8 +83,9 @@ class MusicControlsView(discord.ui.View):
     async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         if self.music_engine.voice_client and (self.music_engine.voice_client.is_playing() or self.music_engine.voice_client.is_paused()):
+            song_title = self.music_engine.current_song['title'] if self.music_engine.current_song else "目前歌曲"
             self.music_engine.voice_client.stop()
-            await interaction.followup.send("⏭️ 已跳過歌曲。", ephemeral=True)
+            await interaction.followup.send(f"⏭️ **{interaction.user.mention}** 已跳過 **{song_title}**。")
 
     @discord.ui.button(label="離開", style=discord.ButtonStyle.danger, emoji="⏹️")
     async def leave_button(self, interaction: discord.Interaction, button: discord.ui.Button):
