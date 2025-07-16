@@ -6,7 +6,7 @@ Developed with [marsh-fish](https://github.com/marsh-fish)
 
 !play [歌名or網址]：馬上點播！有歌在播會自動排隊。
 
-!skip：這首不愛？馬上切歌！:japanese_goblin: 
+!skip：這首不愛？馬上切歌！👺
 
 !pause：中場休息！
 
