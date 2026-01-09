@@ -4,7 +4,6 @@ import yt_dlp
 import asyncio
 import time
 import re
-import requests
 import os  # [新增] 導入 os 模組
 from dotenv import load_dotenv # [新增] 從 dotenv 導入 load_dotenv
 
@@ -22,13 +21,6 @@ TOKEN = os.getenv('TOKEN')
 if TOKEN is None:
     print("錯誤：找不到環境變數 'TOKEN'。請確定你的 .env 檔案已建立且包含 TOKEN。")
     exit() # 如果沒有 Token，直接結束程式
-
-API_KEY = os.getenv('API_KEY')
-
-# 檢查 TOKEN 是否成功載入
-if API_KEY is None:
-    print("錯誤：找不到環境變數 'API_KEY'。請確定你的 .env 檔案已建立且包含 API_KEY。")
-    exit() # 如果沒有 API_KEY，直接結束程式
 
 YDL_OPTIONS = {
     'format': 'bestaudio/best',
@@ -152,8 +144,8 @@ class MusicEngine:
                         except (discord.NotFound, discord.HTTPException):
                             break
                 
-                # 每 2 秒計算一次，頻率夠高，但又不會太耗能
-                await asyncio.sleep(1)
+                # 每 5 秒計算一次，避免頻繁請求導致 Rate Limit
+                await asyncio.sleep(5)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -227,76 +219,77 @@ class MusicEngine:
             await finished.wait()
             self.current_song = None
 
+    def get_video_basic_info(self, search_query: str):
+        """
+        Uses yt_dlp to quickly fetch basic info (title, url) without processing full stream.
+        """
+        try:
+            # Check if it's a URL or search query
+            is_url = re.match(r'^https?://', search_query)
+
+            opts = {
+                'quiet': True,
+                'skip_download': True,
+                'noplaylist': True,
+            }
+
+            if not is_url:
+                search_query = f"ytsearch:{search_query}"
+                opts['extract_flat'] = 'in_playlist' # Faster for search results
+
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(search_query, download=False, process=not is_url)
+                
+                if 'entries' in info:
+                    if not info['entries']:
+                        return None
+                    entry = info['entries'][0]
+                    return {
+                        'title': entry.get('title', search_query),
+                        'url': entry.get('url', search_query)
+                    }
+                else:
+                    return {
+                        'title': info.get('title', 'Unknown Title'),
+                        'url': info.get('webpage_url', search_query)
+                    }
+
+        except Exception as e:
+            print(f"Error fetching basic info: {e}")
+            return None
+
     def get_song_info(self, search_query: str):
         """
-        Searches for a song using the YouTube API if it's not a URL.
-        Then uses yt_dlp to extract the stream info.
+        Uses yt_dlp to extract the stream info.
+        Supports both direct URLs and search queries.
         """
-        # Regex to check if the query is a YouTube URL
-        url_match = re.match(
-            r'https?://(www\.)?(youtube\.com/watch\?v=|youtu\.be/)(?P<id>[a-zA-Z0-9_-]{11})', 
-            search_query
-        )
-
         video_url = search_query
-        
-        # If it's not a URL, use the API to search
-        if not url_match:
-            print(f"'{search_query}' is not a URL, searching with YouTube API...")
-            try:
-                search_params = {
-                    'part': 'snippet',
-                    'q': search_query,
-                    'key': API_KEY,
-                    'type': 'video',
-                    'maxResults': 1
-                }
-                response = requests.get('https://www.googleapis.com/youtube/v3/search', params=search_params).json()
-                
-                video_id = response['items'][0]['id']['videoId']
-                video_url = f'https://www.youtube.com/watch?v={video_id}'
-                print(f"API found video: {video_url}")
 
-            except Exception as e:
-                print(f"YouTube API search failed: {e}")
-                # Fallback to yt_dlp's search if API fails
-                video_url = f"ytsearch:{search_query}"
+        # Check if it looks like a URL, otherwise treat as search
+        if not re.match(r'^https?://', search_query):
+             video_url = f"ytsearch:{search_query}"
 
-        # Now, use yt_dlp to get the stream URL from the determined video_url
         try:
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(video_url, download=False)
+
+                # ytsearch returns entries
                 if 'entries' in info:
+                    if not info['entries']:
+                        return None
                     info = info['entries'][0]
                 
                 return {
                     'source': info['url'], 
                     'title': info.get('title', 'Unknown Title'), 
                     'duration': info.get('duration', 0),
-                    'webpage_url': info.get('webpage_url', video_url),
+                    'webpage_url': info.get('webpage_url', search_query),
                     'thumbnail': info.get('thumbnail')
                 }
         except Exception as e:
             print(f"yt_dlp failed to extract info for '{video_url}': {e}")
             return None
     
-    def get_title_from_url(self, url, api_key=API_KEY):
-        match = re.search(r'v=([a-zA-Z0-9_-]{11})', url)
-        if not match:
-            return None
-        video_id = match.group(1)
-
-        api_url = 'https://www.googleapis.com/youtube/v3/videos'
-        params = {
-            'part': 'snippet',
-            'id': video_id,
-            'key': api_key
-        }
-        response = requests.get(api_url, params=params).json()
-        if 'items' in response and response['items']:
-            return response['items'][0]['snippet']['title']
-        return None
-
     async def send_now_playing_message(self, song_info):
         embed = discord.Embed(title="▶️ 正在播放", description=f"**{song_info['title']}**", color=discord.Color.green())
         
@@ -373,14 +366,19 @@ async def play(ctx, *, search: str = None):
         await ctx.send("你必須在一個語音頻道中才能使用此指令！")
         return
     
-    song_title = music_engine.get_title_from_url(search)
-    if song_title is None:
-        song_title = search
+    # 使用 run_in_executor 避免阻塞，獲取基本資訊
+    basic_info = await bot.loop.run_in_executor(None, music_engine.get_video_basic_info, search)
+
+    song_title = search
+    search_query = search
+
+    if basic_info:
+        song_title = basic_info.get('title', search)
 
     request = { 
         'ctx': ctx, 
         'channel': ctx.author.voice.channel, 
-        'search': search,
+        'search': search_query,
         'song_title': song_title,
         'requester': ctx.author
     }
