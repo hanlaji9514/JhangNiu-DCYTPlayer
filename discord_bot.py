@@ -124,9 +124,12 @@ class MusicEngine:
     def create_progress_bar(self, current_time):
         total_time = self.current_song.get('duration', 0)
         if total_time == 0: return "`直播中，無進度條`"
-        percentage = (current_time / total_time)
+        percentage = (current_time / total_time) if total_time > 0 else 0
         bar_length = 20
-        filled_length = int(bar_length * percentage)
+        # 使用 round 讓進度條更貼近視覺上的比例 (例如 99% 時會進位到滿格)
+        filled_length = round(bar_length * percentage)
+        # 確保不會超過長度
+        filled_length = min(max(filled_length, 0), bar_length)
         bar = '▬' * filled_length + '🔘' + '─' * (bar_length - filled_length)
         formatted_current = self.format_time(current_time)
         formatted_total = self.format_time(total_time)
