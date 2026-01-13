@@ -150,8 +150,8 @@ class MusicEngine:
                         except (discord.NotFound, discord.HTTPException):
                             break
                 
-                # 每 5 秒計算一次，避免頻繁請求導致 Rate Limit
-                await asyncio.sleep(5)
+                # 每 1 秒計算一次，讓進度條看起來更順暢
+                await asyncio.sleep(1)
         except asyncio.CancelledError:
             pass
         except Exception as e:
