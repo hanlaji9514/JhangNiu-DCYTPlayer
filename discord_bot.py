@@ -28,7 +28,13 @@ YDL_OPTIONS = {
     'quiet': True,
     'skip_download': True,
     'default_search': 'ytsearch1',
-    'source_address': '0.0.0.0'
+    'source_address': '0.0.0.0',
+    # [新增] 強制使用 android 客戶端以避免 Web 端被限流 (Signature extraction failed)
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios']
+        }
+    }
 }
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
