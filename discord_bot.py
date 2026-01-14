@@ -226,6 +226,22 @@ class MusicEngine:
             self.progress_updater_task = self.bot.loop.create_task(self.progress_updater())
             
             await finished.wait()
+
+            # [修正] 音樂結束時強制更新進度條到最後，避免顯示的時間不一致 (例如 04:21 / 04:23)
+            if self.current_song and self.now_playing_message:
+                duration = self.current_song.get('duration', 0)
+                current = self.get_current_playback_time()
+                # 如果結束時的時間非常接近總長度 (例如只差 10 秒內)，視為自然結束，強制顯示滿格
+                if duration > 0 and (duration - current) < 10:
+                    try:
+                        # 創建滿格的進度條 (current_time = duration)
+                        final_bar = self.create_progress_bar(duration)
+                        embed = self.now_playing_message.embeds[0]
+                        embed.set_field_at(0, name="進度", value=final_bar, inline=False)
+                        await self.now_playing_message.edit(embed=embed)
+                    except (discord.NotFound, discord.HTTPException):
+                        pass
+
             self.current_song = None
 
     def get_video_basic_info(self, search_query: str):
